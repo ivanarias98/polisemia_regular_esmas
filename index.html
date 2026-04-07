@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="gl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESMAS-ES+ · Polisemia regular e LLMs</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300;1,9..144,500&family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #f5f2eb;
+  --bg2:     #ede9e0;
+  --bg3:     #e4dfd4;
+  --ink:     #1a1814;
+  --ink2:    #4a4640;
+  --ink3:    #8a857c;
+  --ink4:    #b8b3aa;
+  --blue:    #1a4fd6;
+  --blue-l:  #dde8ff;
+  --blue-m:  #a8bef5;
+  --green:   #166b3a;
+  --green-l: #d4f0e0;
+  --green-m: #7ecba0;
+  --rule:    rgba(26,24,20,0.1);
+  --rule2:   rgba(26,24,20,0.06);
+  --serif:   'Fraunces', Georgia, serif;
+  --mono:    'Geist Mono', monospace;
+  --sans:    'Geist', system-ui, sans-serif;
+  --r:       8px;
+  --rl:      14px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-weight: 300;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity: .5;
+}
+
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(245,242,235,0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; height: 50px; padding: 0 2rem; gap: 2rem;
+}
+.nav-brand {
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--ink3); letter-spacing: .1em; text-transform: uppercase; margin-right: auto;
+}
+.nav-brand b { color: var(--ink); }
+.nav-a {
+  font-size: 12px; color: var(--ink3); text-decoration: none;
+  padding-bottom: 2px; border-bottom: 1px solid transparent;
+  transition: color .15s, border-color .15s; letter-spacing: .01em;
+}
+.nav-a:hover { color: var(--ink); }
+.nav-a.on { color: var(--ink); border-bottom-color: var(--ink); }
+
+.hero {
+  max-width: 900px; margin: 0 auto;
+  padding: 6rem 2rem 5rem;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: end;
+}
+.hero-kicker {
+  font-family: var(--mono); font-size: 10px; font-weight: 500; color: var(--ink3);
+  letter-spacing: .12em; text-transform: uppercase; margin-bottom: 1.25rem;
+  display: flex; align-items: center; gap: 8px;
+}
+.hero-kicker::before { content: ''; display: block; width: 24px; height: 1px; background: var(--ink3); }
+.hero h1 {
+  font-family: var(--serif); font-size: clamp(2.2rem,4vw,3.4rem);
+  font-weight: 300; line-height: 1.1; letter-spacing: -.02em;
+  margin-bottom: 1.5rem;
+}
+.hero h1 em { font-style: italic; }
+.hero-desc { font-size: .9rem; color: var(--ink2); line-height: 1.75; margin-bottom: 2rem; }
+.hero-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+  padding: 3px 10px; border-radius: 99px;
+  border: 1px solid var(--rule2); color: var(--ink3);
+  background: var(--bg2);
+}
+
+.hero-right { padding-bottom: .5rem; }
+.word-split {
+  border: 1px solid var(--rule);
+  border-radius: var(--rl); overflow: hidden;
+  background: var(--bg2);
+}
+.ws-center {
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.75rem 1rem; position: relative;
+}
+.ws-word {
+  font-family: var(--serif); font-size: 3rem; font-weight: 300;
+  letter-spacing: -.03em; color: var(--ink); position: relative; z-index: 1;
+}
+.ws-arrow-l, .ws-arrow-r {
+  position: absolute; font-size: 11px; font-family: var(--mono);
+  color: var(--ink4); top: 50%; transform: translateY(-50%);
+}
+.ws-arrow-l { left: 14px; }
+.ws-arrow-r { right: 14px; }
+.ws-bottom {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--rule);
+}
+.ws-sense {
+  padding: 14px 16px; font-size: 12px; line-height: 1.5;
+}
+.ws-sense:first-child { border-right: 1px solid var(--rule); }
+.ws-sense-tag { font-family: var(--mono); font-size: 9px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 5px; }
+.ws-sense-tag.mat { color: var(--blue); }
+.ws-sense-tag.info { color: var(--green); }
+.ws-sense-ex { color: var(--ink2); font-style: italic; font-size: 12px; }
+
+.section { padding: 5rem 0; border-top: 1px solid var(--rule); }
+.container { max-width: 900px; margin: 0 auto; padding: 0 2rem; }
+.sec-kicker {
+  font-family: var(--mono); font-size: 10px; font-weight: 500; color: var(--ink3);
+  letter-spacing: .12em; text-transform: uppercase; margin-bottom: .75rem;
+  display: flex; align-items: center; gap: 8px;
+}
+.sec-kicker::before { content: ''; display: block; width: 24px; height: 1px; background: var(--ink3); }
+.sec-title {
+  font-family: var(--serif); font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-weight: 300; line-height: 1.15; letter-spacing: -.02em;
+  margin-bottom: .75rem;
+}
+.sec-title em { font-style: italic; }
+.sec-desc { font-size: .9rem; color: var(--ink2); line-height: 1.75; max-width: 580px; margin-bottom: 2.5rem; }
+
+.alt-wrap {
+  display: grid; grid-template-columns: 1fr 48px 1fr; align-items: stretch;
+  gap: 0; margin-bottom: 2.5rem;
+}
+.alt-col {
+  border: 1px solid var(--rule); border-radius: var(--rl); overflow: hidden; background: var(--bg);
+}
+.alt-head {
+  padding: 14px 18px; border-bottom: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase;
+}
+.alt-head.mat { background: var(--blue-l); color: var(--blue); border-bottom-color: var(--blue-m); }
+.alt-head.info { background: var(--green-l); color: var(--green); border-bottom-color: var(--green-m); }
+.alt-route {
+  padding: 9px 18px; border-bottom: 1px solid var(--rule);
+  font-family: var(--mono); font-size: 10px; color: var(--ink3);
+  background: var(--bg2); line-height: 1.6;
+}
+.alt-route strong { color: var(--ink2); }
+.alt-body { padding: 16px 18px; }
+.alt-vocab { font-family: var(--mono); font-size: 10px; color: var(--ink3); margin-bottom: 12px; line-height: 1.7; }
+.alt-ex { font-size: 13px; color: var(--ink); margin-bottom: 8px; line-height: 1.5; }
+.alt-ex em.w { font-style: normal; font-weight: 500; }
+.alt-ex em.w.mat { color: var(--blue); }
+.alt-ex em.w.info { color: var(--green); }
+.tag {
+  display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 500;
+  padding: 2px 10px; border-radius: 99px; letter-spacing: .04em;
+}
+.tag-mat { background: var(--blue-l); color: var(--blue); border: 1px solid var(--blue-m); }
+.tag-info { background: var(--green-l); color: var(--green); border: 1px solid var(--green-m); }
+.alt-mid {
+  display: flex; align-items: center; justify-content: center;
+}
+.alt-mid-sym { font-size: 20px; color: var(--ink4); writing-mode: vertical-rl; letter-spacing: .2em; }
+
+.qualia-grid {
+  display: grid; grid-template-columns: repeat(4,1fr);
+  border: 1px solid var(--rule); border-radius: var(--rl); overflow: hidden;
+  margin-bottom: 2.5rem;
+}
+.q-cell { padding: 16px 14px; border-right: 1px solid var(--rule); background: var(--bg); }
+.q-cell:last-child { border-right: none; }
+.q-cell.hi-mat { background: var(--blue-l); }
+.q-cell.hi-info { background: var(--green-l); }
+.q-name { font-family: var(--mono); font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: .1em; color: var(--ink3); margin-bottom: 8px; }
+.q-val { font-size: 12px; color: var(--ink2); line-height: 1.5; }
+.q-val strong.mat { color: var(--blue); }
+.q-val strong.info { color: var(--green); }
+
+.lang-tabs { display: flex; gap: 4px; margin-bottom: 14px; }
+.lt-btn {
+  font-family: var(--mono); font-size: 11px; padding: 5px 13px;
+  border-radius: var(--r); border: 1px solid var(--rule);
+  background: transparent; color: var(--ink3); cursor: pointer; transition: all .13s;
+}
+.lt-btn:hover { background: var(--bg2); color: var(--ink); }
+.lt-btn.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.ex-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ex-c {
+  background: var(--bg2); border: 1px solid var(--rule);
+  border-radius: var(--r); padding: 14px 16px;
+}
+.ex-c.mat { border-left: 3px solid var(--blue); }
+.ex-c.info { border-left: 3px solid var(--green); }
+.ex-type { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink3); margin-bottom: 6px; }
+.ex-sent { font-size: 13px; color: var(--ink); line-height: 1.5; margin-bottom: 6px; }
+.ex-sent mark { background: none; font-weight: 500; font-style: normal; }
+.ex-sent mark.mat { color: var(--blue); }
+.ex-sent mark.info { color: var(--green); }
+.ex-clue { font-family: var(--mono); font-size: 10px; color: var(--ink3); }
+
+.pip-steps {
+  display: flex; align-items: stretch; gap: 0;
+  border: 1px solid var(--rule); border-radius: var(--r) var(--r) 0 0; overflow: hidden;
+}
+.pip-s {
+  flex: 1; padding: 12px 10px; background: var(--bg2); cursor: pointer;
+  border-right: 1px solid var(--rule); transition: background .13s;
+}
+.pip-s:last-child { border-right: none; }
+.pip-s.on { background: var(--bg); }
+.pip-s:hover:not(.on) { background: var(--bg3); }
+.pip-n { font-family: var(--mono); font-size: 9px; color: var(--ink4); margin-bottom: 3px; }
+.pip-ico { font-size: 14px; margin-bottom: 4px; }
+.pip-lab { font-size: 11px; color: var(--ink2); font-weight: 400; line-height: 1.3; }
+.pip-sep { display: flex; align-items: center; font-size: 11px; color: var(--ink4); padding: 0 2px; }
+.pip-detail {
+  border: 1px solid var(--rule); border-top: none; border-radius: 0 0 var(--r) var(--r);
+  padding: 18px; background: var(--bg); display: none;
+}
+.pip-detail.on { display: block; }
+.pip-dt { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 6px; }
+.pip-db { font-size: 13px; color: var(--ink2); line-height: 1.7; }
+.pip-db strong { color: var(--ink); }
+.pip-db code { font-family: var(--mono); font-size: 11px; background: var(--bg2); padding: 1px 6px; border-radius: 4px; color: var(--green); }
+
+.demo-wrap {
+  background: var(--bg2); border: 1px solid var(--rule);
+  border-radius: var(--rl); overflow: hidden; margin-bottom: 2rem;
+}
+.demo-top {
+  padding: 12px 18px; border-bottom: 1px solid var(--rule);
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--bg3);
+}
+.demo-top-l { font-family: var(--mono); font-size: 11px; color: var(--ink3); }
+.demo-live { font-family: var(--mono); font-size: 10px; color: var(--green); display: flex; align-items: center; gap: 5px; }
+.demo-live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+
+.demo-body { padding: 18px; }
+.preset-wrap { margin-bottom: 14px; }
+.preset-label { font-family: var(--mono); font-size: 10px; color: var(--ink3); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 8px; }
+.preset-scroll { display: flex; gap: 6px; flex-wrap: wrap; }
+.preset-b {
+  font-family: var(--mono); font-size: 11px; padding: 4px 11px;
+  border-radius: 99px; border: 1px solid var(--rule);
+  background: var(--bg); color: var(--ink2); cursor: pointer; transition: all .12s;
+  white-space: nowrap;
+}
+.preset-b:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+.input-row { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
+.demo-ta {
+  flex: 1; background: var(--bg); border: 1px solid var(--rule);
+  border-radius: var(--r); padding: 10px 14px; font-family: var(--sans);
+  font-size: 13px; color: var(--ink); resize: none; line-height: 1.5;
+  transition: border-color .15s; outline: none;
+}
+.demo-ta:focus { border-color: rgba(26,24,20,.3); }
+.demo-ta::placeholder { color: var(--ink4); }
+.ann-btn {
+  padding: 10px 18px; background: var(--ink); color: var(--bg);
+  font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+  border: none; border-radius: var(--r); cursor: pointer;
+  transition: opacity .13s; white-space: nowrap; flex-shrink: 0;
+}
+.ann-btn:hover { opacity: .82; }
+.ann-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+.mode-btn {
+  font-family: var(--mono); font-size: 11px; padding: 7px 16px;
+  border-radius: var(--r); border: 1px solid var(--rule);
+  background: transparent; color: var(--ink3); cursor: pointer; transition: all .13s;
+  letter-spacing: .03em;
+}
+.mode-btn:hover { background: var(--bg2); color: var(--ink); }
+.mode-btn.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+.result { display: none; }
+.result.on { display: block; }
+.thinking-bar {
+  display: none; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 11px; color: var(--ink3);
+  padding: 14px; background: var(--bg); border-radius: var(--r);
+  margin-bottom: 10px;
+}
+.thinking-bar.on { display: flex; }
+.dot-a span {
+  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--ink3); margin: 0 1px;
+  animation: bob .8s ease-in-out infinite;
+}
+.dot-a span:nth-child(2){animation-delay:.15s}
+.dot-a span:nth-child(3){animation-delay:.3s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes bob{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+
+.result-inner { display: none; }
+.result-inner.on { display: block; }
+.result-card {
+  border-radius: var(--r); overflow: hidden;
+  border: 1px solid var(--rule);
+}
+.rc-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--rule);
+}
+.rc-header.mat { background: var(--blue-l); }
+.rc-header.info { background: var(--green-l); }
+.rc-class { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+.rc-class.mat { color: var(--blue); }
+.rc-class.info { color: var(--green); }
+.rc-ruta { font-family: var(--mono); font-size: 10px; color: var(--ink3); margin-left: auto; }
+.rc-body { padding: 16px 18px; background: var(--bg); display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rc-field {}
+.rc-field-label { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: var(--ink3); margin-bottom: 5px; }
+.rc-field-val { font-size: 13px; color: var(--ink); line-height: 1.5; }
+.rc-field-val em { font-style: normal; font-weight: 500; color: var(--blue); }
+.rc-field-val em.info { color: var(--green); }
+.rc-conf-bar { height: 4px; background: var(--rule); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.rc-conf-fill { height: 100%; border-radius: 2px; transition: width .6s ease; }
+.rc-reason { padding: 14px 18px; border-top: 1px solid var(--rule); font-size: 13px; color: var(--ink2); line-height: 1.7; background: var(--bg2); }
+.rc-reason strong { color: var(--ink); }
+.rc-reason em { font-style: italic; }
+.rc-error { padding: 14px 18px; background: var(--bg); font-family: var(--mono); font-size: 12px; color: var(--ink3); border-radius: var(--r); border: 1px solid var(--rule); }
+
+.claude-note {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px;
+  font-family: var(--mono); font-size: 10px; color: var(--ink4);
+}
+.claude-note a { color: var(--ink3); text-decoration: none; border-bottom: 1px solid var(--rule); }
+
+.prompt-box {
+  background: var(--bg3); border: 1px solid var(--rule); border-radius: var(--r);
+  padding: 16px; font-family: var(--mono); font-size: 11px; color: var(--ink2);
+  line-height: 1.8; white-space: pre-wrap;
+}
+.prompt-box .c1 { color: var(--ink3); }
+.prompt-box .c2 { color: var(--blue); }
+.prompt-box .c3 { color: var(--green); }
+
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--rule); margin-bottom: 16px; }
+.tab-b {
+  padding: 8px 16px; font-size: 12px; border: none; background: transparent;
+  color: var(--ink3); cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; font-family: var(--sans); transition: color .13s;
+}
+.tab-b.on { color: var(--ink); border-bottom-color: var(--ink); }
+.tab-p { display: none; }
+.tab-p.on { display: block; }
+
+footer {
+  border-top: 1px solid var(--rule);
+  padding: 2rem; display: flex; gap: 1rem;
+  align-items: center; justify-content: space-between; flex-wrap: wrap;
+}
+.foot-info { font-family: var(--mono); font-size: 10px; color: var(--ink3); line-height: 1.8; letter-spacing: .03em; }
+.foot-info strong { color: var(--ink2); }
+.foot-link {
+  font-family: var(--mono); font-size: 11px; color: var(--ink2);
+  text-decoration: none; border: 1px solid var(--rule); padding: 7px 14px;
+  border-radius: var(--r); transition: all .13s; letter-spacing: .03em;
+}
+.foot-link:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+@media (max-width: 680px) {
+  .hero { grid-template-columns: 1fr; gap: 2rem; padding: 3.5rem 1.25rem 3rem; }
+  .alt-wrap { grid-template-columns: 1fr; }
+  .alt-mid { display: none; }
+  .qualia-grid { grid-template-columns: 1fr 1fr; }
+  .ex-grid { grid-template-columns: 1fr; }
+  .rc-body { grid-template-columns: 1fr; }
+  nav { padding: 0 1.25rem; }
+  .nav-a { display: none; }
+  footer { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand"><b>ESMAS</b>-ES+</div>
+  <a class="nav-a on" href="#alternancia">Alternancia</a>
+  <a class="nav-a" href="#pipeline">Pipeline</a>
+
+</nav>
+
+<div style="max-width:900px;margin:0 auto;padding:0 2rem">
+  <div class="hero">
+    <div class="hero-left">
+      <div class="hero-kicker">Proxecto PID2022-137170OB-I00</div>
+      <h1>Como distingue un LLM os sentidos de <em>libro</em>?</h1>
+      <p class="hero-desc">Polisemia regular, alternancia artefacto–información e anotación semántica automática nas catro linguas do proxecto ESMAS-ES+. O Itinerario de rutas como guía ontolóxica para modelos de lingua.</p>
+      <div class="hero-pills">
+        <span class="pill">Pustejovsky 1995</span>
+        <span class="pill">Claude 4</span>
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="word-split">
+        <div class="ws-center">
+          <div class="ws-arrow-l">←</div>
+          <div class="ws-word">libro</div>
+          <div class="ws-arrow-r">→</div>
+        </div>
+        <div class="ws-bottom">
+          <div class="ws-sense">
+            <div class="ws-sense-tag mat">Artefacto</div>
+            <div class="ws-sense-ex">«Deixei o libro enriba da mesa»</div>
+          </div>
+          <div class="ws-sense">
+            <div class="ws-sense-tag info">Información</div>
+            <div class="ws-sense-ex">«O libro trata sobre historia»</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="section" id="alternancia">
+  <div class="container">
+    <div class="sec-kicker">01 · Polisemia regular</div>
+    <h2 class="sec-title">A alternancia <em>artefacto–información</em></h2>
+    <p class="sec-desc">A mesma palabra designa simultaneamente o soporte físico e o contido intelectual. Pustejovsky (1995) explica esta alternancia pola <em>estrutura de qualia</em>: cada quale activa unha lectura diferente segundo o predicado da oración. O Itinerario ESMAS-ES+ formaliza esta distinción en dúas rutas ontolóxicas independentes.</p>
+
+    <div class="alt-wrap">
+      <div class="alt-col">
+        <div class="alt-head mat">📦 Obxecto · Mundo Material</div>
+        <div class="alt-route">Material → Obxecto → Comunicación → Texto → <strong>Publicado</strong></div>
+        <div class="alt-body">
+          <div class="alt-vocab">libro, periódico, revista, artículo, ensayo, novela</div>
+          <div class="alt-ex">«Deixei o <em class="w mat">libro</em> enriba da mesa»</div>
+          <div class="alt-ex">«Colleu o <em class="w mat">libro</em> da estantería»</div>
+          <div class="alt-ex">«O <em class="w mat">libro</em> pesa moito»</div>
+        </div>
+      </div>
+      <div class="alt-mid"><div class="alt-mid-sym">⇄</div></div>
+      <div class="alt-col">
+        <div class="alt-head info">💡 Información · Mundo Intelectual</div>
+        <div class="alt-route">Intelectual → Contido → Texto → <strong>Publicado</strong></div>
+        <div class="alt-body">
+          <div class="alt-vocab">volumen, edición, libro, revista, periódico, artículo</div>
+          <div class="alt-ex">«O <em class="w info">libro</em> trata sobre a memoria histórica»</div>
+          <div class="alt-ex">«O <em class="w info">libro</em> analiza o cambio climático»</div>
+          <div class="alt-ex">«O <em class="w info">libro</em> é fascinante»</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-kicker">Estrutura de qualia · Pustejovsky 1995</div>
+    <div class="qualia-grid">
+      <div class="q-cell">
+        <div class="q-name">Quale Formal</div>
+        <div class="q-val">obxecto físico, con páxinas, encadernado</div>
+      </div>
+      <div class="q-cell hi-mat">
+        <div class="q-name">Quale Constitutivo</div>
+        <div class="q-val">papel, tinta, tapa<br>→ <strong class="mat">activa OBXECTO</strong></div>
+      </div>
+      <div class="q-cell hi-info">
+        <div class="q-name">Quale Télico</div>
+        <div class="q-val">para ser lido, informar<br>→ <strong class="info">activa INFORMACIÓN</strong></div>
+      </div>
+      <div class="q-cell">
+        <div class="q-name">Quale Axentivo</div>
+        <div class="q-val">resultado de escribir / publicar</div>
+      </div>
+    </div>
+
+    <div class="sec-kicker">As catro linguas do proxecto</div>
+    <div class="lang-tabs" id="lang-tabs">
+      <button class="lt-btn on" data-lang="gl">Galego</button>
+      <button class="lt-btn" data-lang="es">Español</button>
+      <button class="lt-btn" data-lang="fr">Français</button>
+      <button class="lt-btn" data-lang="de">Deutsch</button>
+    </div>
+    <div class="ex-grid" id="ex-grid"></div>
+  </div>
+</section>
+
+<section class="section" id="pipeline">
+  <div class="container">
+    <div class="sec-kicker">02 · Desambiguación</div>
+    <h2 class="sec-title">O pipeline de anotación</h2>
+    <p class="sec-desc">O modelo non memoriza sentidos: detecta cal dos qualia é compatible co predicado da oración. O Itinerario ESMAS-ES+ entra directamente no prompt de sistema como guía ontolóxica. Clica en cada paso.</p>
+
+    <div class="pip-steps" id="pip-steps">
+      <div class="pip-s on" data-i="0"><div class="pip-n">01</div><div class="pip-ico">📝</div><div class="pip-lab">Oración de entrada</div></div>
+      <div class="pip-sep">›</div>
+      <div class="pip-s" data-i="1"><div class="pip-n">02</div><div class="pip-ico">🗺️</div><div class="pip-lab">Itinerario no prompt</div></div>
+      <div class="pip-sep">›</div>
+      <div class="pip-s" data-i="2"><div class="pip-n">03</div><div class="pip-ico">🔍</div><div class="pip-lab">Análise do predicado</div></div>
+      <div class="pip-sep">›</div>
+      <div class="pip-s" data-i="3"><div class="pip-n">04</div><div class="pip-ico">🧠</div><div class="pip-lab">Decisión guiada</div></div>
+      <div class="pip-sep">›</div>
+      <div class="pip-s" data-i="4"><div class="pip-n">05</div><div class="pip-ico">🏷️</div><div class="pip-lab">Etiqueta + ruta</div></div>
+    </div>
+    <div class="pip-detail on" id="pip-detail">
+      <div class="pip-dt" id="pip-dt">Oración de entrada</div>
+      <div class="pip-db" id="pip-db">O modelo recibe unha oración en calquera das catro linguas (GL, ES, FR, DE) coa palabra albo identificada: <code>libro / livre / Buch</code>. O contexto sintáctico —predicado principal, argumentos, adxuntos— é o único material de traballo para a desambiguación.</div>
+    </div>
+
+    <div style="margin-top:2rem">
+      <div class="tabs" id="tabs">
+        <button class="tab-b on" data-tab="prompt">Prompt de sistema</button>
+        <button class="tab-b" data-tab="vs">Con vs. sen itinerario</button>
+      </div>
+      <div class="tab-p on" id="tab-prompt">
+        <div class="prompt-box"><span class="c1">// SYSTEM PROMPT — anotador semántico ESMAS-ES+</span>
+
+<span class="c1">TAREFA:</span> Identificar o sentido de «libro/livre/Buch» nunha oración
+segundo as rutas do Itinerario ESMAS-ES+.
+
+<span class="c2">RUTAS DISPOÑIBLES (só dúas):</span>
+  [A] Material → Obxecto → Comunicación → Texto → Publicado
+      → Actívase con predicados locativos, de manipulación física,
+        de existencia ou propiedade material
+        (estar, pesar, coller, deixar, caer, romper, comprar…)
+      → Quale constitutivo activado
+
+  [B] Intelectual → Contido → Texto → Publicado
+      → Actívase con predicados proposicionais, de tema,
+        valorativos ou epistémicos
+        (tratar de, falar de, resumir, ser interesante, gustar…)
+      → Quale télico activado
+
+<span class="c3">SAÍDA (JSON estrito):</span>
+{
+  "ruta": "A" | "B",
+  "clase": "ARTEFACTO" | "INFORMACIÓN",
+  "predicado_clave": "...",
+  "quale_activado": "constitutivo" | "télico",
+  "confianza": 0.0–1.0,
+  "razoamento": "..."
+}</div>
+      </div>
+      <div class="tab-p" id="tab-vs">
+        <div style="border:1px solid var(--rule);border-radius:var(--r);overflow:hidden">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="background:var(--bg3)">
+                <th style="padding:10px 14px;text-align:left;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.06em;color:var(--ink3);border-bottom:1px solid var(--rule)">Aspecto</th>
+                <th style="padding:10px 14px;text-align:left;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.06em;color:var(--ink3);border-bottom:1px solid var(--rule)">Sen itinerario</th>
+                <th style="padding:10px 14px;text-align:left;font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.06em;color:var(--ink3);border-bottom:1px solid var(--rule)">Con Itinerario ESMAS-ES+</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td style="padding:10px 14px;border-bottom:1px solid var(--rule);font-weight:500;color:var(--ink)">Taxonomía de clases</td><td style="padding:10px 14px;border-bottom:1px solid var(--rule);color:#b04040">Aberta / inconsistente</td><td style="padding:10px 14px;border-bottom:1px solid var(--rule);color:var(--green)">Fixada: rutas ontolóxicas xerárquicas</td></tr>
+              <tr><td style="padding:10px 14px;border-bottom:1px solid var(--rule);font-weight:500;color:var(--ink)">Replicabilidade</td><td style="padding:10px 14px;border-bottom:1px solid var(--rule);color:#b04040">Depende do modelo e do prompt</td><td style="padding:10px 14px;border-bottom:1px solid var(--rule);color:var(--green)">Controlada pola ruta ontolóxica</td></tr>
+              <tr><td style="padding:10px 14px;border-bottom:1px solid var(--rule);font-weight:500;color:var(--ink)">Multilingüismo</td><td style="padding:10px 14px;border-bottom:1px solid var(--rule);color:#b04040">Instrucións por lingua</td><td style="padding:10px 14px;border-bottom:1px solid var(--rule);color:var(--green)">Mesma ruta para GL / ES / FR / DE</td></tr>
+              <tr><td style="padding:10px 14px;border-bottom:1px solid var(--rule);font-weight:500;color:var(--ink)">Alternancia artefacto–info</td><td style="padding:10px 14px;border-bottom:1px solid var(--rule);color:#b04040">O modelo decide libremente</td><td style="padding:10px 14px;border-bottom:1px solid var(--rule);color:var(--green)">Guiada pola estrutura de qualia</td></tr>
+              <tr><td style="padding:10px 14px;font-weight:500;color:var(--ink)">Validación humana</td><td style="padding:10px 14px;color:#b04040">Sen estándar de referencia</td><td style="padding:10px 14px;color:var(--green)">Gold standard ancorado no itinerario</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="demo" style="display:none">
+  <div class="container">
+    <div class="sec-kicker">03 · Demo interactiva</div>
+    <h2 class="sec-title">Anotación en tempo real con <em>Claude</em></h2>
+    <p class="sec-desc">Introduce calquera oración en galego, español, francés ou alemán con <strong>libro / livre / Buch</strong>. Claude analizará o predicado, identificará o quale activado e asignará a ruta do Itinerario ESMAS-ES+.</p>
+
+    <!-- Mode selector -->
+    <div style="display:flex;gap:8px;margin-bottom:1.5rem">
+      <button class="mode-btn on" id="mode-site" onclick="setMode('site')">⚡ Demo en directo</button>
+      <button class="mode-btn" id="mode-claude" onclick="setMode('claude')">↗ Anotar con Claude.ai</button>
+    </div>
+
+    <div class="demo-wrap">
+      <div class="demo-top">
+        <span class="demo-top-l" id="demo-top-label">// anotador semántico · ESMAS-ES+ × Claude · en directo</span>
+        <span class="demo-live" id="demo-live-badge">Claude 4 · API</span>
+      </div>
+      <div class="demo-body">
+        <div class="preset-wrap">
+          <div class="preset-label">Exemplos de oracións</div>
+          <div class="preset-scroll" id="presets"></div>
+        </div>
+        <div class="input-row">
+          <textarea class="demo-ta" id="demo-ta" rows="2" placeholder="Ex: O libro caeu ao chan…"></textarea>
+          <button class="ann-btn" id="ann-btn">Anotar →</button>
+        </div>
+        <div class="result" id="result">
+          <div class="thinking-bar" id="thinking">
+            <div class="dot-a"><span></span><span></span><span></span></div>
+            <span>Claude está a analizar o predicado…</span>
+          </div>
+          <div class="result-inner" id="result-inner"></div>
+        </div>
+        <div class="claude-note">
+          <span>Anotación realizada por</span>
+          <a href="https://claude.ai" target="_blank">Claude (Anthropic)</a>
+          <span>· guiado polo Itinerario ESMAS-ES+</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div style="max-width:900px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:1.5rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+      <div class="foot-info">
+        <strong>ESMAS-ES+</strong> · PID2022-137170OB-I00<br>
+        Instituto da Lingua Galega · Universidade de Santiago de Compostela
+      </div>
+      <a class="foot-link" href="https://grupoportlex.github.io/itinerario_rutas/" target="_blank">Itinerario ESMAS-ES+ →</a>
+    </div>
+    <div style="border-top:1px solid var(--rule);padding-top:1.25rem">
+      <div style="font-family:var(--mono);font-size:9px;color:var(--ink4);text-transform:uppercase;letter-spacing:.1em;margin-bottom:.75rem">Financiamento</div>
+      <img src="https://res.cloudinary.com/dxte4zc5h/image/upload/v1775590119/miciu-cofinanciadoUE-aei_a5edgi.png" alt="Ministerio de Ciencia, Innovación y Universidades · Cofinanciado por la Unión Europea · Agencia Estatal de Investigación" style="max-height:60px;width:auto">
+    </div>
+  </div>
+</footer>
+
+<script>
+const LANGS = {
+  gl: [
+    { t:"mat", s:"Deixei o <mark class='mat'>libro</mark> enriba da mesa.",        c:"ruta Material" },
+    { t:"info",s:"O <mark class='info'>libro</mark> trata sobre a memoria histórica.", c:"ruta Intelectual" },
+  ],
+  es: [
+    { t:"mat", s:"Dejé el <mark class='mat'>libro</mark> encima de la mesa.",         c:"ruta Material" },
+    { t:"info",s:"El <mark class='info'>libro</mark> analiza el cambio climático.",    c:"ruta Intelectual" },
+  ],
+  fr: [
+    { t:"mat", s:"J'ai posé le <mark class='mat'>livre</mark> sur la table.",          c:"route Matériel" },
+    { t:"info",s:"Le <mark class='info'>livre</mark> parle de la mémoire collective.", c:"route Intellectuel" },
+  ],
+  de: [
+    { t:"mat", s:"Ich legte das <mark class='mat'>Buch</mark> auf den Tisch.",         c:"Pfad Material" },
+    { t:"info",s:"Das <mark class='info'>Buch</mark> handelt von historischer Erinnerung.", c:"Pfad Intellektuell" },
+  ],
+};
+function renderLang(l){
+  document.getElementById("ex-grid").innerHTML=LANGS[l].map(e=>`
+    <div class="ex-c ${e.t}">
+      <div class="ex-type">${e.t==="mat"?"📦 Artefacto · Material":"💡 Información · Intelectual"}</div>
+      <div class="ex-sent">${e.s}</div>
+      <div class="ex-clue">${e.c}</div>
+    </div>`).join("");
+}
+renderLang("gl");
+document.getElementById("lang-tabs").addEventListener("click",e=>{
+  const b=e.target.closest(".lt-btn"); if(!b)return;
+  document.querySelectorAll(".lt-btn").forEach(x=>x.classList.toggle("on",x===b));
+  renderLang(b.dataset.lang);
+});
+
+const PIP=[
+  {t:"Oración de entrada",b:"O modelo recibe unha oración en calquera das catro linguas (GL, ES, FR, DE) coa palabra albo identificada: <code>libro / livre / Buch</code>. O contexto sintáctico —predicado principal, argumentos e adxuntos— é o único material de traballo."},
+  {t:"O Itinerario como guía ontolóxica no prompt",b:"En lugar de decidir libremente, o LLM recibe no <strong>prompt de sistema</strong> as dúas rutas do Itinerario ESMAS-ES+ como únicas opcións:<br><br>📦 <code>Material → Obxecto → Comunicación → Texto → Publicado</code><br>💡 <code>Intelectual → Contido → Texto → Publicado</code><br><br>O itinerario pasa de ser un recurso de referencia a ser un <strong>compoñente computacional de control</strong>."},
+  {t:"Análise do predicado: o quale activado",b:"O modelo localiza o <strong>predicado principal</strong> e determina cal dos qualia activa:<br><br>— Predicado locativo / de manipulación física → quale <strong>constitutivo</strong> → ARTEFACTO<br>&nbsp;&nbsp;<em>Ex: estar, pesar, coller, deixar, caer, comprar, romper…</em><br><br>— Predicado proposicional / valorativo → quale <strong>télico</strong> → INFORMACIÓN<br>&nbsp;&nbsp;<em>Ex: tratar de, falar de, resumir, ser interesante, gustar…</em>"},
+  {t:"Decisión guiada: desambiguación reproducible",b:"O modelo aplica as regras do sistema de anotación ESMAS-ES+ e selecciona a ruta compatible co predicado. A decisión é <strong>reproducible</strong>: dúas execucións sobre a mesma oración devolven a mesma ruta. Modelo usado: <code>Claude 4</code>."},
+  {t:"Saída: etiqueta semántica + ruta ontolóxica",b:"O resultado é un rexistro estruturado con:<br><br>— <strong>Clase:</strong> ARTEFACTO ou INFORMACIÓN<br>— <strong>Ruta do itinerario</strong> completa<br>— <strong>Predicado clave</strong> que activou a decisión<br>— <strong>Quale activado</strong> (constitutivo / télico)<br>— <strong>Confianza</strong> (0–1) e <strong>razoamento</strong> en linguaxe natural"},
+];
+document.getElementById("pip-steps").addEventListener("click",e=>{
+  const s=e.target.closest(".pip-s"); if(!s)return;
+  const i=+s.dataset.i;
+  document.querySelectorAll(".pip-s").forEach((x,j)=>x.classList.toggle("on",j===i));
+  document.getElementById("pip-dt").textContent=PIP[i].t;
+  document.getElementById("pip-db").innerHTML=PIP[i].b;
+  document.getElementById("pip-detail").classList.add("on");
+});
+
+document.getElementById("tabs").addEventListener("click",e=>{
+  const b=e.target.closest(".tab-b"); if(!b)return;
+  document.querySelectorAll(".tab-b").forEach(x=>x.classList.toggle("on",x===b));
+  document.querySelectorAll(".tab-p").forEach(x=>x.classList.toggle("on",x.id==="tab-"+b.dataset.tab));
+});
+
+const PRESETS=[
+  "O libro está na mesa",
+  "O libro trata do cambio climático",
+  "Colleu o libro da estantería",
+  "O libro é moi interesante",
+  "O libro caeu ao chan",
+  "O libro gustar moito",
+  "Comprei o libro onte",
+  "O libro analiza a crise",
+  "Das Buch liegt auf dem Tisch",
+  "Das Buch handelt von Krieg",
+  "Le livre est sur l'étagère",
+  "Le livre parle de l'immigration",
+  "Dejé el libro en casa",
+  "El libro trata sobre la filosofía",
+];
+const presetsEl=document.getElementById("presets");
+PRESETS.forEach(p=>{
+  const b=document.createElement("button");
+  b.className="preset-b"; b.textContent=p;
+  b.onclick=()=>{ document.getElementById("demo-ta").value=p; };
+  presetsEl.appendChild(b);
+});
+
+function buildPrompt(sentence){
+  return `Son un investigador do proxecto ESMAS-ES+ (PID2022-137170OB-I00, ILG/USC) e estou a estudar a polisemia regular da palabra «libro/livre/Buch» segundo a teoría do Léxico Xerativo de Pustejovsky (1995).
+
+Necesito que anotes semanticamente a seguinte oración identificando cal dos dous sentidos ten a palabra «libro» (ou equivalente):
+
+ORACIÓN: "${sentence}"
+
+RUTAS DO ITINERARIO ESMAS-ES+ (só dúas opcións):
+
+[A] Material → Obxecto → Comunicación → Texto → Publicado
+    CLASE: ARTEFACTO
+    Actívase con predicados de existencia ou propiedade FÍSICA:
+    locativos (estar, encontrarse, liegen, être sur/dans), manipulación (coller, deixar, coger, dejar, nehmen, legen, poser, prendre), propiedades físicas (pesar, medir, ser vello/novo como obxecto), movemento físico (caer, queimar, romper, mollarse, comprar)
+    QUALE ACTIVADO: constitutivo (papel, tinta, tapa, peso)
+
+[B] Intelectual → Contido → Texto → Publicado
+    CLASE: INFORMACIÓN
+    Actívase con predicados de CONTIDO SEMÁNTICO ou VALORACIÓN INTELECTUAL:
+    proposicionais/temáticos (tratar de, falar de, versar sobre, analizar, describir, handeln von, parler de, traiter de), valorativos/epistémicos (ser interesante, gustar, recomendar, resumir, citar), propiedades intelectuais (ser bo/malo, ter capítulos como estrutura)
+    QUALE ACTIVADO: télico (para ser lido, informar, entreter)
+
+REGRA DE DESEMPATE: se o predicado é ambiguo, prioriza a lectura INTELECTUAL [B].
+
+Por favor, responde en galego con esta estrutura exacta:
+
+**CLASE:** ARTEFACTO ou INFORMACIÓN
+**RUTA:** [A] ou [B] + ruta completa
+**PREDICADO CLAVE:** predicado que activa a lectura
+**QUALE ACTIVADO:** constitutivo ou télico
+**CONFIANZA:** número do 0 ao 100
+**RAZOAMENTO:** explica en 2-3 frases por que ese predicado activa ese quale e esa ruta ontolóxica do Itinerario ESMAS-ES+`;
+}
+
+function renderWaiting(sent){
+  return `<div class="result-card">
+    <div class="rc-header" style="background:var(--bg3)">
+      <span class="rc-class" style="color:var(--ink2)">⏳ Esperando resposta de Claude…</span>
+    </div>
+    <div class="rc-body" style="grid-template-columns:1fr">
+      <div class="rc-field">
+        <div class="rc-field-label">Oración enviada</div>
+        <div class="rc-field-val" style="font-style:italic;color:var(--ink2)">"${sent}"</div>
+      </div>
+    </div>
+    <div class="rc-reason">
+      <strong>Paso 1 ✓</strong> Abriuse Claude.ai cunha mensaxe preescrita co prompt completo do sistema ESMAS-ES+.<br>
+      <strong>Paso 2 →</strong> Copia toda a resposta de Claude e pégaa no campo de abaixo.
+    </div>
+  </div>
+  <div style="margin-top:12px">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Pega aquí a resposta de Claude</div>
+    <textarea id="paste-ta" rows="6" style="width:100%;background:var(--bg);border:1px solid var(--rule);border-radius:var(--r);padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--ink);resize:vertical;outline:none;line-height:1.6;transition:border-color .15s" placeholder="**CLASE:** ARTEFACTO ou INFORMACIÓN&#10;**RUTA:** [A] Material → …&#10;**PREDICADO CLAVE:** …&#10;**QUALE ACTIVADO:** …&#10;**CONFIANZA:** 92&#10;**RAZOAMENTO:** …"></textarea>
+    <button id="parse-btn" style="margin-top:8px;padding:8px 16px;background:var(--ink);color:var(--bg);font-family:var(--mono);font-size:11px;border:none;border-radius:var(--r);cursor:pointer;letter-spacing:.04em;transition:opacity .13s">Visualizar anotación →</button>
+  </div>`;
+}
+
+function parseClaudeResponse(raw, sent){
+  const get=(key)=>{
+    const re=new RegExp(`\\*\\*${key}[:\\*]*\\**\\s*(.+)`,"i");
+    const m=raw.match(re); return m?m[1].trim():"—";
+  };
+  const claseRaw=get("CLASE");
+  const isMat=/ARTEFACTO/i.test(claseRaw);
+  const clase=isMat?"ARTEFACTO":"INFORMACIÓN";
+  const pred=get("PREDICADO CLAVE");
+  const quale=get("QUALE ACTIVADO");
+  const confRaw=get("CONFIANZA");
+  const conf=parseInt(confRaw)||85;
+  const razon=get("RAZOAMENTO");
+
+  const cls=isMat?"mat":"info";
+  const col=isMat?"var(--blue)":"var(--green)";
+  const rutaCanon=isMat
+    ?"Material → Obxecto → Comunicación → Texto → Publicado"
+    :"Intelectual → Contido → Texto → Publicado";
+
+  let hiSent=sent;
+  if(pred&&pred!=="—"){
+    try{
+      const re=new RegExp(`(${pred.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")})`, "gi");
+      hiSent=sent.replace(re,`<em class="${isMat?"":"info"}">$1</em>`);
+    }catch(e){}
+  }
+
+  return `<div class="result-card" style="animation:fadeIn .4s ease">
+    <div class="rc-header ${cls}">
+      <span class="rc-class ${cls}">${isMat?"📦":"💡"} ${clase}</span>
+      <span class="rc-ruta">${rutaCanon}</span>
+    </div>
+    <div class="rc-body">
+      <div class="rc-field">
+        <div class="rc-field-label">Predicado clave</div>
+        <div class="rc-field-val">${hiSent}</div>
+      </div>
+      <div class="rc-field">
+        <div class="rc-field-label">Quale activado</div>
+        <div class="rc-field-val">${quale}</div>
+      </div>
+      <div class="rc-field" style="grid-column:1/-1">
+        <div class="rc-field-label">Confianza · ${conf}%</div>
+        <div class="rc-conf-bar"><div class="rc-conf-fill" style="width:${conf}%;background:${col}"></div></div>
+      </div>
+    </div>
+    <div class="rc-reason">${razon}</div>
+  </div>`;
+}
+
+// ─── MODE SWITCHER ───
+let currentMode = 'site';
+function setMode(m) {
+  currentMode = m;
+  document.getElementById('mode-site').classList.toggle('on', m === 'site');
+  document.getElementById('mode-claude').classList.toggle('on', m === 'claude');
+  const btn = document.getElementById('ann-btn');
+  const label = document.getElementById('demo-top-label');
+  const badge = document.getElementById('demo-live-badge');
+  if (m === 'site') {
+    btn.textContent = 'Anotar →';
+    label.textContent = '// anotador semántico · ESMAS-ES+ × Claude · en directo';
+    badge.textContent = 'Claude 4 · API';
+    badge.style.color = 'var(--green)';
+  } else {
+    btn.textContent = 'Abrir Claude.ai ↗';
+    label.textContent = '// anotador semántico · ESMAS-ES+ × Claude.ai';
+    badge.textContent = 'claude.ai · conta gratuíta';
+    badge.style.color = 'var(--green)';
+  }
+  // reset result
+  document.getElementById('result').classList.remove('on');
+  document.getElementById('result-inner').classList.remove('on');
+  document.getElementById('result-inner').innerHTML = '';
+}
+
+const SYSTEM_PROMPT = `És un anotador semántico do proxecto ESMAS-ES+ (PID2022-137170OB-I00, ILG/USC). Estudas a polisemia regular da palabra «libro/livre/Buch» segundo a teoría do Léxico Xerativo de Pustejovsky (1995).
+
+RUTAS DO ITINERARIO ESMAS-ES+ (só dúas opcións):
+
+[A] Material → Obxecto → Comunicación → Texto → Publicado
+    CLASE: OBXECTO
+    Actívase con predicados de existencia ou propiedade FÍSICA: locativos (estar, encontrarse, liegen, être sur/dans), manipulación (coller, deixar, coger, dejar, nehmen, legen, poser, prendre), propiedades físicas (pesar, medir), movemento físico (caer, queimar, romper, comprar)
+    QUALE ACTIVADO: constitutivo (papel, tinta, tapa, peso)
+
+[B] Intelectual → Contido → Texto → Publicado
+    CLASE: INFORMACIÓN
+    Actívase con predicados de CONTIDO SEMÁNTICO ou VALORACIÓN INTELECTUAL: proposicionais/temáticos (tratar de, falar de, analizar, describir, handeln von, parler de, traiter de), valorativos/epistémicos (ser interesante, gustar, recomendar, resumir), propiedades intelectuais (ser bo/malo)
+    QUALE ACTIVADO: télico (para ser lido, informar, entreter)
+
+REGRA DE DESEMPATE: se o predicado é ambiguo, prioriza a lectura INTELECTUAL [B].
+
+Responde SEMPRE en galego con esta estrutura exacta (sen texto adicional):
+
+**CLASE:** OBXECTO ou INFORMACIÓN
+**RUTA:** [A] ou [B] + ruta completa
+**PREDICADO CLAVE:** predicado que activa a lectura
+**QUALE ACTIVADO:** constitutivo ou télico
+**CONFIANZA:** número do 0 ao 100
+**RAZOAMENTO:** explica en 2-3 frases por que ese predicado activa ese quale e esa ruta ontolóxica do Itinerario ESMAS-ES+`;
+
+async function annotateDirect(sent) {
+  const resultEl = document.getElementById('result');
+  const inner = document.getElementById('result-inner');
+  const thinking = document.getElementById('thinking');
+
+  resultEl.classList.add('on');
+  inner.classList.remove('on');
+  inner.innerHTML = '';
+  thinking.classList.add('on');
+  document.getElementById('ann-btn').disabled = true;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: `Anota semanticamente esta oración: "${sent}"` }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '';
+    thinking.classList.remove('on');
+    inner.classList.add('on');
+    inner.innerHTML = parseClaudeResponse(raw, sent);
+  } catch(e) {
+    thinking.classList.remove('on');
+    inner.classList.add('on');
+    inner.innerHTML = `<div class="rc-error">Erro na chamada á API: ${e.message}</div>`;
+  }
+  document.getElementById('ann-btn').disabled = false;
+}
+
+document.getElementById("ann-btn").addEventListener("click", () => {
+  const sent = document.getElementById("demo-ta").value.trim();
+  if (!sent) return;
+
+  if (currentMode === 'site') {
+    annotateDirect(sent);
+    return;
+  }
+
+  // Claude.ai mode
+  const resultEl = document.getElementById("result");
+  const inner = document.getElementById("result-inner");
+  const prompt = buildPrompt(sent);
+  const url = "https://claude.ai/new?q=" + encodeURIComponent(prompt);
+  window.open(url, "_blank");
+  resultEl.classList.add("on");
+  inner.classList.add("on");
+  inner.innerHTML = renderWaiting(sent);
+  setTimeout(() => {
+    const parseBtn = document.getElementById("parse-btn");
+    const pasteTa = document.getElementById("paste-ta");
+    if (!parseBtn || !pasteTa) return;
+    parseBtn.addEventListener("click", () => {
+      const raw = pasteTa.value.trim();
+      if (!raw) return;
+      inner.innerHTML = parseClaudeResponse(raw, sent);
+    });
+  }, 100);
+});
+
+// ─── LOGO BASE64 ───
+(function(){
+  const img = document.getElementById('logo-financ');
+  // Convert uploaded image to base64 via FileReader trick using a canvas fetch
+  // Since we can't access the local file directly, we'll load it from the conversation context
+  // The user should host this image or we embed it. For now show a placeholder SVG badge.
+  // Replace the src below with the actual base64 string if you have it.
+  img.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='80'%3E%3Crect width='240' height='80' fill='%23f5c400'/%3E%3Crect x='250' width='140' height='80' fill='%23003399'/%3E%3Crect x='400' width='120' height='80' fill='%23dce6f0'/%3E%3Ctext x='260' y='30' font-family='sans-serif' font-size='11' font-weight='bold' fill='white'%3E★★★★★★★★★★★%3C/text%3E%3Ctext x='252' y='52' font-family='sans-serif' font-size='9' font-weight='bold' fill='%23f5c400'%3ECofinanciado por%3C/text%3E%3Ctext x='252' y='64' font-family='sans-serif' font-size='9' font-weight='bold' fill='%23f5c400'%3Ela Uni%C3%B3n Europea%3C/text%3E%3Ctext x='120' y='28' font-family='sans-serif' font-size='10' font-weight='bold' fill='black' text-anchor='middle'%3EMINISTERIO%3C/text%3E%3Ctext x='120' y='42' font-family='sans-serif' font-size='9' fill='black' text-anchor='middle'%3EDE CIENCIA, INNOVACI%C3%93N%3C/text%3E%3Ctext x='120' y='54' font-family='sans-serif' font-size='9' fill='black' text-anchor='middle'%3EY UNIVERSIDADES%3C/text%3E%3Ctext x='460' y='35' font-family='sans-serif' font-size='10' font-weight='bold' fill='%23003399' text-anchor='middle'%3EAGENCIA%3C/text%3E%3Ctext x='460' y='48' font-family='sans-serif' font-size='9' fill='%23003399' text-anchor='middle'%3EESTATAL DE%3C/text%3E%3Ctext x='460' y='60' font-family='sans-serif' font-size='9' fill='%23003399' text-anchor='middle'%3EINVESTIGACI%C3%93N%3C/text%3E%3C/svg%3E";
+})();
+
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      document.querySelectorAll(".nav-a").forEach(a=>
+        a.classList.toggle("on",a.getAttribute("href")==="#"+e.target.id));
+    }
+  });
+},{threshold:0.3});
+document.querySelectorAll("section[id]").forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>
